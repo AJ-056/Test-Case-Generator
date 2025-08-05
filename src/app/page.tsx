@@ -16,7 +16,7 @@ import {
   createPRAction,
 } from './actions';
 import { Logo } from '@/components/icons';
-import { Github, KeyRound, FileCode, List, Wand2, ClipboardCopy, GitMerge, LoaderCircle, CheckCircle2, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
+import { Github, KeyRound, FileCode, List, Wand2, ClipboardCopy, GitMerge, LoaderCircle, CheckCircle2, AlertTriangle, ExternalLink, RefreshCw, AlertCircle, LockIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 type FileNode = {
@@ -165,9 +165,236 @@ export default function Home() {
 
   const isLoading = appState.endsWith('_loading');
 
+  const renderInitialState = () => (
+    <div className="flex-1 flex items-center justify-center p-4 md:p-6 lg:p-8">
+      <div className="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+        <Card className="bg-card/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-2xl">
+              <Logo className="h-8 w-8 text-primary" />
+              Connect to GitHub
+            </CardTitle>
+            <CardDescription>Connect your GitHub repository to generate test cases</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="pat">GitHub Personal Access Token</Label>
+              <Input id="pat" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" value={pat} onChange={(e) => setPat(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Create a token at <a href="https://github.com/settings/tokens" target="_blank" rel="noreferrer" className="underline text-primary">github.com/settings/tokens</a>
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="repo-url">Repository</Label>
+              <Input id="repo-url" placeholder="username/repository-name" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} />
+               <p className="text-xs text-muted-foreground">Format: owner/repository-name (e.g., facebook/react)</p>
+            </div>
+            <Button onClick={handleLoadFiles} disabled={!repoUrl || !pat} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Logo className="w-5 h-5 mr-2" />
+              Connect Repository
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">Your token is stored securely and only used to access your repository</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-card/50">
+          <CardHeader>
+             <CardTitle className="flex items-center gap-2 text-xl">
+               <AlertCircle className="w-5 h-5 text-yellow-400" /> Getting Started
+             </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="p-4 rounded-md bg-yellow-400/10 border border-yellow-400/20 text-sm">
+              <p className="flex items-center gap-2"> <LockIcon className="w-4 h-4"/> To connect to GitHub, you'll need a Personal Access Token with 'repo' permissions.</p>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-3">Steps to use this application:</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li className="flex items-start gap-3">
+                  <span className="flex items-center justify-center text-xs rounded-full bg-primary/20 text-primary-foreground h-5 w-5 mt-0.5">1</span>
+                  <span>Create a GitHub Personal Access Token</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="flex items-center justify-center text-xs rounded-full bg-primary/20 text-primary-foreground h-5 w-5 mt-0.5">2</span>
+                   <span>Enter your token and repository (format: username/repo-name)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                   <span className="flex items-center justify-center text-xs rounded-full bg-primary/20 text-primary-foreground h-5 w-5 mt-0.5">3</span>
+                   <span>Browse and select code files you want to generate tests for</span>
+                </li>
+                 <li className="flex items-start gap-3">
+                   <span className="flex items-center justify-center text-xs rounded-full bg-primary/20 text-primary-foreground h-5 w-5 mt-0.5">4</span>
+                   <span>Click "Generate Test Cases" to get AI suggestions</span>
+                </li>
+                <li className="flex items-start gap-3">
+                   <span className="flex items-center justify-center text-xs rounded-full bg-primary/20 text-primary-foreground h-5 w-5 mt-0.5">5</span>
+                   <span>Generate actual test code and optionally create a PR</span>
+                </li>
+              </ul>
+            </div>
+
+            <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank" rel="noreferrer" className="w-full">
+              <Button variant="outline" className="w-full">
+                <ExternalLink className="w-4 h-4 mr-2" /> Create Token
+              </Button>
+            </a>
+
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Supported Languages:</strong> JavaScript, TypeScript, Python, Java, Go, Rust</p>
+              <p><strong>Test Frameworks:</strong> Jest, JUnit, pytest (automatically detected)</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+
+  const renderAppWorkflow = () => (
+     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Column 1: Connect and Select Files */}
+        <Card className="h-full flex flex-col">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><span className="flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground h-6 w-6">1</span> Review Files</CardTitle>
+            <CardDescription>Select files for test generation from your repository.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col gap-4">
+            <div className="flex-1 flex flex-col min-h-0">
+              <Label className="flex items-center gap-2 mb-2"><FileCode className="w-4 h-4" /> Code Files</Label>
+              <div className="border rounded-md flex-1">
+                <ScrollArea className="h-72">
+                  <div className="p-4">
+                    {appState === 'files_loading' && (
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-6 w-full" />
+                        <Skeleton className="h-6 w-1/2" />
+                      </div>
+                    )}
+                    {files.length > 0 && (
+                      <ul className="space-y-2">
+                        {files.map(file => (
+                          <li key={file.path} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={file.path} 
+                              onCheckedChange={(checked) => handleSelectFile(file.path, !!checked)}
+                              disabled={isLoading}
+                            />
+                            <label htmlFor={file.path} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{file.path}</label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+
+            <Button onClick={handleGenerateSummaries} disabled={isLoading || selectedFilePaths.size === 0 || appState === 'summaries_loading'}>
+              {appState === 'summaries_loading' && <LoaderCircle className="animate-spin mr-2"/>}
+              Generate Test Summaries
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Column 2: Select Summary & Generate Code */}
+        <Card className="h-full flex flex-col">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><span className="flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground h-6 w-6">2</span> Review & Generate</CardTitle>
+            <CardDescription>Select a test case summary and generate the corresponding test code.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col gap-4">
+             <div className="flex-1 flex flex-col min-h-0">
+                <Label className="flex items-center gap-2 mb-2"><List className="w-4 h-4"/>Test Case Summaries</Label>
+                <div className="border rounded-md flex-1">
+                  <ScrollArea className="h-72">
+                    <div className="p-4">
+                        {appState === 'summaries_loading' && (
+                           <div className="space-y-2">
+                            <Skeleton className="h-6 w-full" />
+                            <Skeleton className="h-6 w-5/6" />
+                            <Skeleton className="h-6 w-3/4" />
+                          </div>
+                        )}
+                        {appState !== 'summaries_loading' && summaries.length === 0 && (
+                           <p className="text-sm text-muted-foreground text-center py-10">Generate summaries to see them here.</p>
+                        )}
+                        {summaries.length > 0 && (
+                          <RadioGroup onValueChange={setSelectedSummary} value={selectedSummary || ''} disabled={isLoading}>
+                            {summaries.map((summary, index) => (
+                              <div key={index} className="flex items-center space-x-2">
+                                <RadioGroupItem value={summary} id={`summary-${index}`} />
+                                <Label htmlFor={`summary-${index}`}>{summary}</Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        )}
+                    </div>
+                  </ScrollArea>
+                </div>
+             </div>
+             <div className="space-y-2">
+                <Label htmlFor="class-name">Primary Class Name to Test</Label>
+                <Input id="class-name" placeholder="e.g., Calculator" value={primaryClassName} onChange={(e) => setPrimaryClassName(e.target.value)} disabled={isLoading || summaries.length === 0} />
+             </div>
+             <Button onClick={handleGenerateCode} disabled={isLoading || !selectedSummary || !primaryClassName}>
+                {appState === 'code_loading' && <LoaderCircle className="animate-spin mr-2"/>}
+                <Wand2 className="mr-2"/> Generate Test Code
+             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Column 3: View Code & Create PR */}
+        <Card className="h-full flex flex-col">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><span className="flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground h-6 w-6">3</span> Commit</CardTitle>
+            <CardDescription>Review the generated test code and create a pull request on GitHub.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col gap-4">
+            <div className="flex-1 flex flex-col min-h-0 relative">
+              <Label className="flex items-center gap-2 mb-2">Generated Code</Label>
+              <div className="border rounded-md flex-1 bg-muted/30">
+                <ScrollArea className="h-72">
+                  <pre className="p-4 font-code text-sm whitespace-pre-wrap break-all">
+                     {appState === 'code_loading' && <Skeleton className="h-24 w-full" />}
+                     {appState !== 'code_loading' && !generatedCode && <span className="text-muted-foreground">Generate code to see it here.</span>}
+                     {generatedCode && <code>{generatedCode}</code>}
+                  </pre>
+                </ScrollArea>
+              </div>
+              {generatedCode && (
+                  <Button variant="ghost" size="icon" className="absolute top-0 right-1" onClick={handleCopyCode}>
+                      <ClipboardCopy className="w-4 h-4"/>
+                  </Button>
+              )}
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="test-filename">Test Filename</Label>
+                <Input id="test-filename" placeholder="e.g., MyClassTest.java" value={testFileName} onChange={(e) => setTestFileName(e.target.value)} disabled={isLoading || !generatedCode}/>
+             </div>
+            <Button onClick={handleCreatePr} disabled={isLoading || !generatedCode || !testFileName}>
+              {appState === 'pr_loading' && <LoaderCircle className="animate-spin mr-2"/>}
+              <GitMerge className="mr-2"/> Create Pull Request
+            </Button>
+            {appState === 'pr_created' && prUrl && (
+              <div className="p-4 rounded-md bg-green-500/10 border border-green-500/20 text-sm text-green-700 dark:text-green-400 flex flex-col items-center text-center gap-2">
+                  <CheckCircle2 className="w-8 h-8"/>
+                  <p className="font-semibold">Pull Request created successfully!</p>
+                  <a href={prUrl} target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline">
+                          View on GitHub <ExternalLink className="w-4 h-4 ml-2"/>
+                      </Button>
+                  </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+  )
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <header className="p-4 border-b border-border flex items-center justify-between">
+       <header className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Logo className="h-8 w-8 text-primary" />
           <div>
@@ -182,180 +409,34 @@ export default function Home() {
         )}
       </header>
 
-      <main className="flex-1 p-4 md:p-6 lg:p-8">
+      <main className="flex-1 flex flex-col">
         {appState === 'error' && (
-           <Card className="mb-6 bg-destructive/10 border-destructive">
-             <CardHeader>
-               <CardTitle className="flex items-center gap-2 text-destructive">
-                 <AlertTriangle /> An Error Occurred
-               </CardTitle>
-               <CardDescription className="text-destructive">
-                {errorMessage}
-               </CardDescription>
-             </CardHeader>
-             <CardContent>
-                <Button onClick={() => setAppState('initial')}>
-                    Start Over
-                </Button>
-             </CardContent>
-           </Card>
+           <div className="p-4 md:p-6 lg:p-8">
+            <Card className="mb-6 bg-destructive/10 border-destructive">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangle /> An Error Occurred
+                </CardTitle>
+                <CardDescription className="text-destructive">
+                  {errorMessage}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <Button onClick={() => setAppState(files.length > 0 ? 'files_loaded' : 'initial')}>
+                      Go Back
+                  </Button>
+              </CardContent>
+            </Card>
+           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          {/* Column 1: Connect and Select Files */}
-          <Card className="h-full flex flex-col">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><span className="flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground h-6 w-6">1</span> Connect & Select</CardTitle>
-              <CardDescription>Connect to a GitHub repository to select files for test generation.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="repo-url" className="flex items-center gap-2"><Github className="w-4 h-4"/>GitHub Repository URL</Label>
-                <Input id="repo-url" placeholder="https://github.com/owner/repo" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} disabled={isLoading || appState !== 'initial'} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pat" className="flex items-center gap-2"><KeyRound className="w-4 h-4" />Personal Access Token</Label>
-                <Input id="pat" type="password" placeholder="ghp_..." value={pat} onChange={(e) => setPat(e.target.value)} disabled={isLoading || appState !== 'initial'} />
-              </div>
-              <Button onClick={handleLoadFiles} disabled={isLoading || !repoUrl || !pat || appState !== 'initial'}>
-                {appState === 'files_loading' && <LoaderCircle className="animate-spin mr-2"/>}
-                Load Files
-              </Button>
-              
-              <div className="flex-1 flex flex-col min-h-0">
-                <Label className="flex items-center gap-2 mb-2"><FileCode className="w-4 h-4" /> Code Files</Label>
-                <div className="border rounded-md flex-1">
-                  <ScrollArea className="h-72">
-                    <div className="p-4">
-                      {appState === 'files_loading' && (
-                        <div className="space-y-2">
-                          <Skeleton className="h-6 w-3/4" />
-                          <Skeleton className="h-6 w-full" />
-                          <Skeleton className="h-6 w-1/2" />
-                        </div>
-                      )}
-                      {appState !== 'files_loading' && files.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-10">Load a repository to see files here.</p>
-                      )}
-                      {files.length > 0 && (
-                        <ul className="space-y-2">
-                          {files.map(file => (
-                            <li key={file.path} className="flex items-center space-x-2">
-                              <Checkbox 
-                                id={file.path} 
-                                onCheckedChange={(checked) => handleSelectFile(file.path, !!checked)}
-                                disabled={isLoading}
-                              />
-                              <label htmlFor={file.path} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{file.path}</label>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-              </div>
-
-              <Button onClick={handleGenerateSummaries} disabled={isLoading || selectedFilePaths.size === 0 || appState === 'summaries_loading'}>
-                {appState === 'summaries_loading' && <LoaderCircle className="animate-spin mr-2"/>}
-                Generate Test Summaries
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Column 2: Select Summary & Generate Code */}
-          <Card className="h-full flex flex-col">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><span className="flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground h-6 w-6">2</span> Review & Generate</CardTitle>
-              <CardDescription>Select a test case summary and generate the corresponding test code.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-4">
-               <div className="flex-1 flex flex-col min-h-0">
-                  <Label className="flex items-center gap-2 mb-2"><List className="w-4 h-4"/>Test Case Summaries</Label>
-                  <div className="border rounded-md flex-1">
-                    <ScrollArea className="h-72">
-                      <div className="p-4">
-                          {appState === 'summaries_loading' && (
-                             <div className="space-y-2">
-                              <Skeleton className="h-6 w-full" />
-                              <Skeleton className="h-6 w-5/6" />
-                              <Skeleton className="h-6 w-3/4" />
-                            </div>
-                          )}
-                          {appState !== 'summaries_loading' && summaries.length === 0 && (
-                             <p className="text-sm text-muted-foreground text-center py-10">Generate summaries to see them here.</p>
-                          )}
-                          {summaries.length > 0 && (
-                            <RadioGroup onValueChange={setSelectedSummary} value={selectedSummary || ''} disabled={isLoading}>
-                              {summaries.map((summary, index) => (
-                                <div key={index} className="flex items-center space-x-2">
-                                  <RadioGroupItem value={summary} id={`summary-${index}`} />
-                                  <Label htmlFor={`summary-${index}`}>{summary}</Label>
-                                </div>
-                              ))}
-                            </RadioGroup>
-                          )}
-                      </div>
-                    </ScrollArea>
-                  </div>
-               </div>
-               <div className="space-y-2">
-                  <Label htmlFor="class-name">Primary Class Name to Test</Label>
-                  <Input id="class-name" placeholder="e.g., Calculator" value={primaryClassName} onChange={(e) => setPrimaryClassName(e.target.value)} disabled={isLoading || summaries.length === 0} />
-               </div>
-               <Button onClick={handleGenerateCode} disabled={isLoading || !selectedSummary || !primaryClassName}>
-                  {appState === 'code_loading' && <LoaderCircle className="animate-spin mr-2"/>}
-                  <Wand2 className="mr-2"/> Generate Test Code
-               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Column 3: View Code & Create PR */}
-          <Card className="h-full flex flex-col">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><span className="flex items-center justify-center text-xs rounded-full bg-primary text-primary-foreground h-6 w-6">3</span> Commit</CardTitle>
-              <CardDescription>Review the generated test code and create a pull request on GitHub.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-4">
-              <div className="flex-1 flex flex-col min-h-0 relative">
-                <Label className="flex items-center gap-2 mb-2">Generated Code</Label>
-                <div className="border rounded-md flex-1 bg-muted/30">
-                  <ScrollArea className="h-72">
-                    <pre className="p-4 font-code text-sm whitespace-pre-wrap break-all">
-                       {appState === 'code_loading' && <Skeleton className="h-24 w-full" />}
-                       {appState !== 'code_loading' && !generatedCode && <span className="text-muted-foreground">Generate code to see it here.</span>}
-                       {generatedCode && <code>{generatedCode}</code>}
-                    </pre>
-                  </ScrollArea>
-                </div>
-                {generatedCode && (
-                    <Button variant="ghost" size="icon" className="absolute top-0 right-1" onClick={handleCopyCode}>
-                        <ClipboardCopy className="w-4 h-4"/>
-                    </Button>
-                )}
-              </div>
-               <div className="space-y-2">
-                  <Label htmlFor="test-filename">Test Filename</Label>
-                  <Input id="test-filename" placeholder="e.g., MyClassTest.java" value={testFileName} onChange={(e) => setTestFileName(e.target.value)} disabled={isLoading || !generatedCode}/>
-               </div>
-              <Button onClick={handleCreatePr} disabled={isLoading || !generatedCode || !testFileName}>
-                {appState === 'pr_loading' && <LoaderCircle className="animate-spin mr-2"/>}
-                <GitMerge className="mr-2"/> Create Pull Request
-              </Button>
-              {appState === 'pr_created' && prUrl && (
-                <div className="p-4 rounded-md bg-green-500/10 border border-green-500/20 text-sm text-green-700 dark:text-green-400 flex flex-col items-center text-center gap-2">
-                    <CheckCircle2 className="w-8 h-8"/>
-                    <p className="font-semibold">Pull Request created successfully!</p>
-                    <a href={prUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline">
-                            View on GitHub <ExternalLink className="w-4 h-4 ml-2"/>
-                        </Button>
-                    </a>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {appState === 'initial' && renderInitialState()}
+        
+        {appState !== 'initial' && appState !== 'error' && (
+          <div className="flex-1 p-4 md:p-6 lg:p-8">
+            {renderAppWorkflow()}
+          </div>
+        )}
       </main>
     </div>
   );
