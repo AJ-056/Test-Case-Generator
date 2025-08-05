@@ -36,14 +36,27 @@ async function githubApi(endpoint: string, pat: string, options: RequestInit = {
     });
   
     if (!response.ok) {
-        const errorBody = await response.json();
+        const errorBody = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
         const errorMessage = errorBody.message || 'An unknown error occurred';
         console.error(`GitHub API Error on ${endpoint}:`, errorMessage);
+
+        if (response.status === 403) {
+            throw new Error(JSON.stringify({
+                message: `GitHub API Error: Access forbidden. Please ensure your Personal Access Token has the 'repo' scope and that you have permissions for this repository.`,
+                status: response.status,
+            }));
+        }
+
         throw new Error(JSON.stringify({
             message: `GitHub API Error: ${errorMessage}`,
             status: response.status,
         }));
     }
+
+    if (response.status === 204) {
+      return;
+    }
+
     return response.json();
 }
 
