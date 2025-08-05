@@ -1,0 +1,158 @@
+'use server';
+
+import { summarizeTestCases, type SummarizeTestCasesInput } from '@/ai/flows/summarize-test-cases';
+import { generateTestCode, type GenerateTestCodeInput } from '@/ai/flows/generate-test-code';
+
+const GITHUB_API_URL = 'https://api.github.com';
+
+type RepoInfo = {
+  owner: string;
+  repo: string;
+};
+
+function parseRepoUrl(url: string): RepoInfo {
+  try {
+    const path = new URL(url).pathname;
+    const [owner, repo] = path.split('/').filter(Boolean);
+    if (!owner || !repo) {
+      throw new Error('Invalid GitHub URL path.');
+    }
+    return { owner, repo };
+  } catch (error) {
+    throw new Error('Invalid URL format.');
+  }
+}
+
+async function githubApi(endpoint: string, pat: string, options: RequestInit = {}): Promise<any> {
+    const url = `${GITHUB_API_URL}${endpoint}`;
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `token ${pat}`,
+        Accept: 'application/vnd.github.v3+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+  
+    if (!response.ok) {
+        const errorBody = await response.json();
+        const errorMessage = errorBody.message || 'An unknown error occurred';
+        console.error(`GitHub API Error on ${endpoint}:`, errorMessage);
+        throw new Error(JSON.stringify({
+            message: `GitHub API Error: ${errorMessage}`,
+            status: response.status,
+        }));
+    }
+    return response.json();
+}
+
+export async function fetchRepoFiles(repoUrl: string, pat: string): Promise<{ tree: { path: string, type: 'blob' | 'tree', url: string }[] }> {
+    const { owner, repo } = parseRepoUrl(repoUrl);
+    const repoData = await githubApi(`/repos/${owner}/${repo}`, pat);
+    const defaultBranch = repoData.default_branch;
+
+    if (!defaultBranch) {
+        throw new Error(JSON.stringify({ message: "Could not determine the default branch of the repository." }));
+    }
+
+    const treeData = await githubApi(`/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, pat);
+    return treeData;
+}
+
+export async function generateSummariesAction(
+  filesToSummarize: string[],
+  repoUrl: string,
+  pat: string
+): Promise<{ testCaseSummaries: string[] }> {
+  const { owner, repo } = parseRepoUrl(repoUrl);
+  
+  const fileContents = await Promise.all(
+    filesToSummarize.map(async (path) => {
+      const contentData = await githubApi(`/repos/${owner}/${repo}/contents/${path}`, pat);
+      const content = Buffer.from(contentData.content, 'base64').toString('utf-8');
+      return { name: path, content };
+    })
+  );
+
+  const input: SummarizeTestCasesInput = {
+    codeFiles: fileContents,
+  };
+
+  return await summarizeTestCases(input);
+}
+
+
+export async function generateCodeAction(
+    filesForContext: string[],
+    repoUrl: string,
+    pat: string,
+    testCaseSummary: string,
+    className: string
+  ): Promise<{ testCode: string }> {
+    const { owner, repo } = parseRepoUrl(repoUrl);
+  
+    const fileContents = await Promise.all(
+      filesForContext.map(async (path) => {
+        const contentData = await githubApi(`/repos/${owner}/${repo}/contents/${path}`, pat);
+        return Buffer.from(contentData.content, 'base64').toString('utf-8');
+      })
+    );
+  
+    const input: GenerateTestCodeInput = {
+      fileContent: fileContents.join('\n\n---\n\n'),
+      testCaseSummary,
+      className,
+    };
+  
+    return await generateTestCode(input);
+  }
+
+  export async function createPRAction(
+    repoUrl: string,
+    pat: string,
+    filename: string,
+    fileContent: string,
+    commitMessage: string
+  ): Promise<{ html_url: string }> {
+    const { owner, repo } = parseRepoUrl(repoUrl);
+    const newBranchName = `testgenius/test-${Date.now()}`;
+  
+    // 1. Get default branch and its latest commit SHA
+    const repoData = await githubApi(`/repos/${owner}/${repo}`, pat);
+    const baseBranch = repoData.default_branch;
+    const branchData = await githubApi(`/repos/${owner}/${repo}/branches/${baseBranch}`, pat);
+    const baseCommitSha = branchData.commit.sha;
+  
+    // 2. Create new branch
+    await githubApi(`/repos/${owner}/${repo}/git/refs`, pat, {
+      method: 'POST',
+      body: JSON.stringify({
+        ref: `refs/heads/${newBranchName}`,
+        sha: baseCommitSha,
+      }),
+    });
+  
+    // 3. Create file on the new branch
+    await githubApi(`/repos/${owner}/${repo}/contents/${filename}`, pat, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: commitMessage,
+          content: Buffer.from(fileContent).toString('base64'),
+          branch: newBranchName,
+        }),
+    });
+
+    // 4. Create Pull Request
+    const prData = await githubApi(`/repos/${owner}/${repo}/pulls`, pat, {
+        method: 'POST',
+        body: JSON.stringify({
+            title: commitMessage,
+            head: newBranchName,
+            base: baseBranch,
+            body: 'Generated by TestGenius AI. Please review and merge.',
+        }),
+    });
+  
+    return prData;
+  }
